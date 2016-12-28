@@ -16,11 +16,11 @@ forward_to_outside()
 
 	iptables -A FORWARD -p $proto --dport $port \
 		$FROM_INSIDE $dst_restrict \
-		-m state --state NEW,ESTABLISHED -j ACCEPT
+		-m conntrack --ctstate=NEW,ESTABLISHED -j ACCEPT
 
 	iptables -A FORWARD -p $proto --sport $port \
 		$src_restrict $TO_INSIDE \
-		-m state --state ESTABLISHED -j ACCEPT
+		-m conntrack --ctstate=ESTABLISHED -j ACCEPT
 }
 
 forward_to_inside()
@@ -30,11 +30,11 @@ forward_to_inside()
 
 	iptables -A FORWARD -p $proto --dport $port \
 		$FROM_OUTIDE $TO_INSIDE \
-		-m state --state NEW,ESTABLISHED -j ACCEPT
+		-m conntrack --ctstate=NEW,ESTABLISHED -j ACCEPT
 
 	iptables -A FORWARD -p $proto --sport $port \
 		$FROM_INSIDE $TO_OUTSIDE \
-		-m state --state ESTABLISHED -j ACCEPT
+		-m conntrack --ctstate=ESTABLISHED -j ACCEPT
 }
 
 accept_from_outside()
@@ -43,12 +43,12 @@ accept_from_outside()
 	port=$2
 
 	iptables -A INPUT -p $proto --dport $port \
-		$FROM_OUTSIDE \
-		-m state --state NEW,ESTABLISHED -j ACCEPT
+		$FROM_OUTSIDE -d $OUTSIDE_ADDR\
+		-m conntrack --ctstate=NEW,ESTABLISHED -j ACCEPT
 
 	iptables -A OUTPUT -p $proto --sport $port \
-		$TO_OUTSIDE \
-		-m state --state ESTABLISHED -j ACCEPT
+		$TO_OUTSIDE -s $OUTSIDE_ADDR\
+		-m conntrack --ctstate=ESTABLISHED -j ACCEPT
 }
 
 accept_from_inside()
@@ -57,12 +57,12 @@ accept_from_inside()
 	port=$2
 
 	iptables -A INPUT -p $proto --dport $port \
-		$FROM_INSIDE \
-		-m state --state NEW,ESTABLISHED -j ACCEPT
+		$FROM_INSIDE -d $INSIDE_ADDR \
+		-m conntrack --ctstate=NEW,ESTABLISHED -j ACCEPT
 
 	iptables -A OUTPUT -p $proto --sport $port \
-		$TO_INSIDE \
-		-m state --state ESTABLISHED -j ACCEPT
+		$TO_INSIDE -s $INSIDE_ADDR \
+		-m conntrack --ctstate=ESTABLISHED -j ACCEPT
 }
 
 accept_from_dmz()
@@ -71,12 +71,12 @@ accept_from_dmz()
 	port=$2
 
 	iptables -A INPUT -p $proto --dport $port \
-		$FROM_DMZ \
-		-m state --state NEW,ESTABLISHED -j ACCEPT
+		$FROM_DMZ -d $DMZ_ADDR \
+		-m conntrack --ctstate=NEW,ESTABLISHED -j ACCEPT
 
 	iptables -A OUTPUT -p $proto --sport $port \
-		$TO_DMZ \
-		-m state --state ESTABLISHED -j ACCEPT
+		$TO_DMZ -s $DMZ_ADDR \
+		-m conntrack --ctstate=ESTABLISHED -j ACCEPT
 }
 
 allow_to_outside()
@@ -85,12 +85,12 @@ allow_to_outside()
 	port=$2
 
 	iptables -A OUTPUT -p $proto --dport $port \
-		$TO_OUTSIDE \
-		-m state --state NEW,ESTABLISHED -j ACCEPT
+		$TO_OUTSIDE -s $OUTSIDE_ADDR \
+		-m conntrack --ctstate=NEW,ESTABLISHED -j ACCEPT
 
 	iptables -A INPUT -p $proto --sport $port \
-		$FROM_OUTSIDE \
-		-m state --state ESTABLISHED -j ACCEPT
+		$FROM_OUTSIDE -d $OUTSIDE_ADDR \
+		-m conntrack --ctstate=ESTABLISHED -j ACCEPT
 }
 
 allow_to_inside()
@@ -99,25 +99,45 @@ allow_to_inside()
 	port=$2
 
 	iptables -A OUTPUT -p $proto --dport $port \
-		$TO_INSIDE \
-		-m state --state NEW,ESTABLISHED -j ACCEPT
+		$TO_INSIDE  -s $INSIDE_ADDR \
+		-m conntrack --ctstate=NEW,ESTABLISHED -j ACCEPT
 
 	iptables -A INPUT -p $proto --sport $port \
-		$FROM_INSIDE \
-		-m state --state ESTABLISHED -j ACCEPT
+		$FROM_INSIDE -d $INSIDE_ADDR\
+		-m conntrack --ctstate=ESTABLISHED -j ACCEPT
 }
 
 forward_host_to_outside()
 {
-	host=$1
+	
+	proto=$1
+	net=$2
 
-	iptables -A FORWARD \
-        -i $INSIDE_IF -s $host \
+	iptables -A FORWARD -p $proto \
+        -i $INSIDE_IF -s $net \
 		$TO_OUTSIDE \
-		-m state --state NEW,ESTABLISHED -j ACCEPT
+		-m conntrack --ctstate=NEW,ESTABLISHED -j ACCEPT
 
-	iptables -A FORWARD \
-        -o $INSIDE_IF -d $host \
+	iptables -A FORWARD -p $proto \
+        -o $INSIDE_IF -d $net \
 		$FROM_OUTSIDE \
-		-m state --state ESTABLISHED -j ACCEPT
+		-m conntrack --ctstate=ESTABLISHED -j ACCEPT
+
+#	iptables -t nat -A POSTROUTING \
+#		-s $net -p $proto \
+#		$TO_OUTSIDE -j MASQUERADE
+}
+
+allow_to_nameserver()
+{
+	echo "$(date) - Allow all traffic to and from DNS servers"
+	for dnsserverip in `grep nameserver /etc/resolv.conf | sed 's/.* //'` ; do
+        	iptables -A OUTPUT -o $OUTSIDE_IF -d $dnsserverip -p udp --dport domain \
+			--sport 1024:65535 -s $OUTSIDE_ADDR \
+			-m conntrack --ctstate=NEW,ESTABLISHED -j ACCEPT
+
+        	iptables -A INPUT -i $OUTSIDE_IF -s $dnsserverip -p udp --sport domain \
+			--dport 1024:65535 -d $OUTSIDE_ADDR \
+			-m conntrack --ctstate=ESTABLISHED -j ACCEPT
+	done
 }
