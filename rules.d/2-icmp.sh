@@ -1,5 +1,8 @@
 #!/bin/sh
 
+MYLIMIT="-m limit --limit 4/s --limit-burst 8"
+MTOWNER="-m conntrack --ctstate=NEW,ESTABLISHED -m owner --gid-owner root"
+
 iptables -N icmp-i
 iptables -N icmp-o
 iptables -N icmp-f
@@ -8,17 +11,22 @@ iptables -A OUTPUT -p icmp -j icmp-o
 iptables -A FORWARD -p icmp -j icmp-f
 
 
+#   Drop fragmented ICMP
+iptables -A icmp-i -p icmp -f -j DROP
+iptables -A icmp-o -p icmp -f -j DROP
+iptables -A icmp-f -p icmp -f -j DROP
+
 #
 # Traffic through the firewall
 #
-iptables -A icmp-f $FROM_INSIDE $TO_OUTSIDE -p icmp --icmp-type echo-request -j ACCEPT
-iptables -A icmp-f $FROM_OUTSIDE $TO_INSIDE -p icmp --icmp-type echo-reply -j ACCEPT
+iptables -A icmp-f $FROM_INSIDE $TO_OUTSIDE -p icmp --icmp-type echo-request $MYLIMIT -j ACCEPT
+iptables -A icmp-f $FROM_OUTSIDE $TO_INSIDE -p icmp --icmp-type echo-reply $MYLIMIT -j ACCEPT
 
 iptables -A icmp-f $FROM_INSIDE $TO_DMZ -p icmp --icmp-type echo-request -j ACCEPT
 iptables -A icmp-f $FROM_DMZ $TO_INSIDE -p icmp --icmp-type echo-reply -j ACCEPT
 
-iptables -A icmp-f $FROM_DMZ $TO_OUTSIDE -p icmp --icmp-type echo-request -j ACCEPT
-iptables -A icmp-f $FROM_OUTSIDE $TO_DMZ -p icmp --icmp-type echo-reply -j ACCEPT
+iptables -A icmp-f $FROM_DMZ $TO_OUTSIDE -p icmp --icmp-type echo-request $MYLIMIT -j ACCEPT
+iptables -A icmp-f $FROM_OUTSIDE $TO_DMZ -p icmp --icmp-type echo-reply $MYLIMIT -j ACCEPT
 
 #
 # Traffic to the firewall
@@ -29,19 +37,19 @@ iptables -A icmp-o $TO_INSIDE -p icmp --icmp-type echo-reply -j ACCEPT
 iptables -A icmp-i $FROM_DMZ -p icmp --icmp-type echo-request -j ACCEPT
 iptables -A icmp-o $TO_DMZ -p icmp --icmp-type echo-reply -j ACCEPT
 
-iptables -A icmp-i $FROM_OUTSIDE -p icmp --icmp-type echo-request -j ACCEPT
-iptables -A icmp-o $TO_OUTSIDE -p icmp --icmp-type echo-reply -j ACCEPT
+iptables -A icmp-i $FROM_OUTSIDE -p icmp --icmp-type echo-request $MYLIMIT -j ACCEPT
+iptables -A icmp-o $TO_OUTSIDE -p icmp --icmp-type echo-reply $MYLIMIT -j ACCEPT
 
 #
 # Traffic from the firewall
 #
-iptables -A icmp-o $TO_INSIDE -p icmp --icmp-type echo-request -j ACCEPT
+iptables -A icmp-o $TO_INSIDE -p icmp --icmp-type echo-request $MTOWNER -j ACCEPT
 iptables -A icmp-i $FROM_INSIDE -p icmp --icmp-type echo-reply -j ACCEPT
 
-iptables -A icmp-o $TO_DMZ -p icmp --icmp-type echo-request -j ACCEPT
+iptables -A icmp-o $TO_DMZ -p icmp --icmp-type echo-request $MTOWNER -j ACCEPT
 iptables -A icmp-i $FROM_DMZ -p icmp --icmp-type echo-reply -j ACCEPT
 
-iptables -A icmp-o $TO_OUTSIDE -p icmp --icmp-type echo-request -j ACCEPT
+iptables -A icmp-o $TO_OUTSIDE -p icmp --icmp-type echo-request $MTOWNER -j ACCEPT
 iptables -A icmp-i $FROM_OUTSIDE -p icmp --icmp-type echo-reply -j ACCEPT
 
 #
