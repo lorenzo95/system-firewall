@@ -1,13 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Rules controlling traffic to/from the firewall itself 
 #
-
+echo "[+] - firewall"
 . functions.sh
-
-# allow everything on the loopback interface
-#iptables -A INPUT  -i lo -j ACCEPT
-#iptables -A OUTPUT -o lo -j ACCEPT
 
 # logging
 #allow_to_inside tcp 514

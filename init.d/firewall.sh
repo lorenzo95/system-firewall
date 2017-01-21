@@ -15,7 +15,8 @@ PATH=/sbin:/bin
 . /lib/init/vars.sh
 . /lib/lsb/init-functions
 
-FIREWALL_DIR=/home/admin/firewall
+#FIREWALL_DIR=/home/admin/firewall
+FIREWALL_DIR=/root/system-firewall-master
 
 do_start () {
 	if [ ! -d $FIREWALL_DIR ]
