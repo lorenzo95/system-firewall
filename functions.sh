@@ -130,7 +130,6 @@ forward_host_to_outside()
 
 allow_to_nameserver()
 {
-	echo "$(date) - Allow all traffic to and from DNS servers"
 	for dnsserverip in `grep nameserver /etc/resolv.conf | sed 's/.* //'` ; do
         	iptables -A OUTPUT -o $OUTSIDE_IF -d $dnsserverip -p udp --dport domain \
 			--sport 1024:65535 -s $OUTSIDE_ADDR \
@@ -140,4 +139,87 @@ allow_to_nameserver()
 			--dport 1024:65535 -d $OUTSIDE_ADDR \
 			-m conntrack --ctstate=ESTABLISHED -j ACCEPT
 	done
+}
+
+
+
+
+forward_port_to_lxc()
+{
+	# First, we want to transfer packets from outside to the LXC port 
+	# on our external address to the LXC port on our server.
+	#
+	# Secondly, for devices that can be connected to external or internal 
+	# networks, we redirect connections to the external address directly
+	# to the LXC server.
+	#
+
+	LXC_SERVER_IP=$(lxc-info -n $1 | awk '/^IP:/ {print $2}')
+	LXC_SERVER_PORT=$2
+
+	#
+	# Rewrite/redirect connections to our public port via DNAT (rewrite
+	# destination address) and SNAT (rewrite source address).
+	#
+	iptables -t nat -A PREROUTING -p tcp \
+		-i $OUTSIDE_IF --dport $LXC_SERVER_PORT  \
+		-j DNAT --to-destination $LXC_SERVER_IP:$LXC_SERVER_PORT
+
+	iptables -t nat -A POSTROUTING -p tcp \
+		-o $LXC_IF -d $LXC_SERVER_IP --dport $LXC_SERVER_PORT  \
+		-j SNAT --to $LXC_ADDR
+
+	#
+	# Forward the incoming connections through the firewall
+	#
+	iptables -A FORWARD -p tcp \
+		-i $OUTSIDE_IF \
+		-o $LXC_IF -d $LXC_SERVER_IP --dport $LXC_SERVER_PORT \
+		-m conntrack --ctstate NEW \
+		-m limit --limit 60/s --limit-burst 20 \
+		-j ACCEPT
+
+	iptables -A FORWARD -p tcp \
+		-i $OUTSIDE_IF \
+		-o $LXC_IF -d $LXC_SERVER_IP --dport $LXC_SERVER_PORT \
+		-m conntrack --ctstate NEW -j DROP
+
+	iptables -A FORWARD -p tcp \
+		-i $OUTSIDE_IF \
+		-o $LXC_IF -d $LXC_SERVER_IP --dport $LXC_SERVER_PORT \
+		-m conntrack --ctstate ESTABLISHED \
+		-j ACCEPT
+
+	iptables -A FORWARD -p tcp \
+		-i $LXC_IF -s $LXC_SERVER_IP --sport $LXC_SERVER_PORT \
+		-o $OUTSIDE_IF \
+		-m state --state ESTABLISHED -j ACCEPT
+
+	#
+	# Redirect outgoing connections to the public port back to the
+	# internal server.
+	#
+	# I use this so that if I can switch portable device between the inside and
+	# outside networks and just have them configured with the external address
+	# of the mail server.  Otherwise you probably don't need to use these
+	# rules.
+	#
+	if [ "$OUTSIDE_ADDR" ]
+	then
+		iptables -t nat -A PREROUTING -p tcp \
+			-i $INSIDE_IF -s $INSIDE_NET -d $OUTSIDE_ADDR --dport $LXC_SERVER_PORT \
+			-j DNAT --to-destination $LXC_SERVER_IP:$LXC_SERVER_PORT
+
+        	iptables -A FORWARD -p tcp \
+                	-i $INSIDE_IF \
+	                -o $LXC_IF -d $LXC_SERVER_IP --dport $LXC_SERVER_PORT \
+	                -m state --state NEW,ESTABLISHED -j ACCEPT
+
+        	iptables -A FORWARD -p tcp \
+                	-i $LXC_IF -s $LXC_SERVER_IP --sport $LXC_SERVER_PORT \
+	                -o $INSIDE_IF \
+	                -m state --state ESTABLISHED -j ACCEPT
+	else
+		echo "NOTE: not redirecting outgoing imaps connections to mail server"
+	fi
 }

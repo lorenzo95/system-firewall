@@ -1,6 +1,4 @@
-#!/bin/bash
-
-echo "[+] - defend"
+#!/bin/sh
 
 #
 # Testing by Gero

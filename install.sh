@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# iptables configuration for "straker"
+# iptables configuration for "Lorenzo95"
 #
 
 echo "$(date) - ** Starting firewall configuration..."
@@ -22,11 +22,16 @@ then
 fi
 
 #
-# Configuration
+# Functions
 #
+
+getint() {
+    ip addr show $1 |  awk '/^    inet / {print $2}'
+}
 
 getip() {
     ip addr show $1 | grep -Po 'inet \K[\d.]+'
+    #ipcalc $1 | awk '/^Address/ {print $2}'
 }
 
 getcidr() {
@@ -47,17 +52,11 @@ getnet() {
 
 getbcast() {
     ip addr show $1 | grep -Po 'brd \K[\d.]+'
+    #ipcalc $1 |  awk '/^Broadcast/ {print $2}'
 }
 
-
-
-#---------------------------#
-# BPI-R1 VLAN configuration #
-#---------------------------#
 #
-# port ordering (view from front):
-# [ 2 1 0 4 ] [ 3 ]
-# [ eth0.101 eth0.102 eth0.103 eth0.104 ] [ eth0.201 ]
+# Configuring Interfaces
 #
 
 export OUTSIDE_IF=enp1s0
@@ -92,6 +91,16 @@ echo "[+] DMZ Interface: $DMZ_IF"
 echo "[+] Address $DMZ_ADDR"
 echo "[+] Network $DMZ_NET"
 echo "[+] Broadcast $DMZ_BCAST"
+echo "[-] "
+
+export LXC_IF=lxcbr0
+export LXC_ADDR=$(getip $LXC_IF)
+export LXC_NET=$(getnet $LXC_ADDR $(getcidr $LXC_IF))
+
+echo "[+] LXC Interface: $LXC_IF"
+echo "[+] Address $LXC_ADDR"
+echo "[+] Network $LXC_NET"
+
 echo "###################################################"
 
 if [ -z "$OUTSIDE_ADDR" ]
@@ -100,6 +109,7 @@ then
 	exit 1
 fi
 
+#exit 1
 
 ############################################################################
 
@@ -150,10 +160,11 @@ iptables -Z -t raw
 # -X for Delete the optional user-defined chain specified. 
 # If no argument is given, it will attempt to delete every non-builtin chain in the table. 
 iptables -X
-iptables -X -t mangle
 iptables -X -t nat
+iptables -X -t mangle
 iptables -X -t raw
 
+# Clear all dynamic IP lists
 ipset destroy
 
 # add blocking entries at the front of the chains
@@ -167,29 +178,12 @@ ip6tables -P INPUT DROP
 ip6tables -P OUTPUT DROP
 ip6tables -P FORWARD DROP
 
-#for r in $DIR/rules.d/*.sh
-#do
-#	echo "running $r..."
-#	$r
-#done
+for r in $DIR/rules.d/*.sh
+do
+	echo "running $r..."
+	$r
+done
 
-
-
-
-#
-#
-#
-
-$DIR/rules.d/0-defend.sh
-$DIR/rules.d/1-firewall.sh
-$DIR/rules.d/2-icmp.sh
-$DIR/rules.d/3-outgoing.sh
-
-
-
-#
-#
-#
 
 
 

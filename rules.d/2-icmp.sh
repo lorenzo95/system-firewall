@@ -1,6 +1,4 @@
-#!/bin/bash
-
-echo "[+] - icmp"
+#!/bin/sh
 
 MYLIMIT="-m limit --limit 4/s --limit-burst 8"
 MTOWNER="-m conntrack --ctstate=NEW,ESTABLISHED -m owner --gid-owner root"
