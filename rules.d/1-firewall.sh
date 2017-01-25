@@ -9,8 +9,8 @@
 #allow_to_inside tcp 514
 
 #web for testing
-#allow_to_outside tcp http
-#allow_to_outside tcp https
+allow_to_outside tcp http
+allow_to_outside tcp https
 
 # DNS
 #allow_to_outside tcp domain

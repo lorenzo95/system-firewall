@@ -49,7 +49,6 @@ getnet() {
     echo $((2#${binIP0::8})).$((2#${binIP0:8:8})).$((2#${binIP0:16:8})).$((2#${binIP0:24:8}))/$2
 }
 
-
 getbcast() {
     ip addr show $1 | grep -Po 'brd \K[\d.]+'
     #ipcalc $1 |  awk '/^Broadcast/ {print $2}'
@@ -59,12 +58,13 @@ getbcast() {
 # Configuring Interfaces
 #
 
+echo "###################################################"
+
 export OUTSIDE_IF=enp1s0
 export OUTSIDE_NET=0.0.0.0/0
 export OUTSIDE_ADDR=$(getip $OUTSIDE_IF)
 export OUTSIDE_BCAST=$(getbcast $OUTSIDE_IF)
 
-echo "###################################################"
 echo "[+] Outside Interface: $OUTSIDE_IF"
 echo "[+] Address $OUTSIDE_ADDR"
 echo "[+] Network $OUTSIDE_NET"
@@ -109,16 +109,17 @@ then
 	exit 1
 fi
 
-#exit 1
-
 ############################################################################
 
 export FROM_INSIDE="-i $INSIDE_IF -s $INSIDE_NET"
 export FROM_OUTSIDE="-i $OUTSIDE_IF -s $OUTSIDE_NET"
 export FROM_DMZ="-i $DMZ_IF -s $DMZ_NET"
+export FROM_LXC="-i $LXC_IF -s $LXC_NET"
 export TO_INSIDE="-o $INSIDE_IF -d $INSIDE_NET"
 export TO_OUTSIDE="-o $OUTSIDE_IF -d $OUTSIDE_NET"
 export TO_DMZ="-o $DMZ_IF -d $DMZ_NET"
+export TO_LXC="-o $LXC_IF -d $LXC_NET"
+
 
 modprobe iptable_nat
 modprobe ip_conntrack
@@ -178,12 +179,18 @@ ip6tables -P INPUT DROP
 ip6tables -P OUTPUT DROP
 ip6tables -P FORWARD DROP
 
+
+
+
+#
+# Running rules.d instructions
+#
+
 for r in $DIR/rules.d/*.sh
 do
 	echo "running $r..."
 	$r
 done
-
 
 
 

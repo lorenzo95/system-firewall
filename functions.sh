@@ -79,6 +79,8 @@ accept_from_dmz()
 		-m conntrack --ctstate=ESTABLISHED -j ACCEPT
 }
 
+
+
 allow_to_outside()
 {
 	proto=$1
@@ -111,15 +113,16 @@ forward_host_to_outside()
 {
 	
 	proto=$1
-	net=$2
+	INT=$2
+	NET=$3
 
 	iptables -A FORWARD -p $proto \
-        -i $INSIDE_IF -s $net \
+        -i $INT -s $NET \
 		$TO_OUTSIDE \
 		-m conntrack --ctstate=NEW,ESTABLISHED -j ACCEPT
 
 	iptables -A FORWARD -p $proto \
-        -o $INSIDE_IF -d $net \
+        -o $INT -d $NET \
 		$FROM_OUTSIDE \
 		-m conntrack --ctstate=ESTABLISHED -j ACCEPT
 

@@ -53,6 +53,7 @@ ipset -N ipset-banned-exempt hash:net
 ipset add ipset-banned-exempt 192.168.1.0/24
 ipset add ipset-banned-exempt 192.168.1.1
 ipset add ipset-banned-exempt 192.168.1.5
+ipset add ipset-banned-exempt 10.0.3.0/24
 
 ipset -N ipset-banned-all hash:net
 

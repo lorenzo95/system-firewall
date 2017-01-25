@@ -6,8 +6,11 @@
 . functions.sh
 
 # special dispensation for specific hosts
-forward_host_to_outside tcp $INSIDE_NET    # Inside Network
-forward_host_to_outside udp $INSIDE_NET
+forward_host_to_outside tcp $INSIDE_IF $INSIDE_NET    # Inside Network
+forward_host_to_outside udp $INSIDE_IF $INSIDE_NET
+
+forward_host_to_outside tcp $LXC_IF $LXC_NET
+forward_host_to_outside udp $LXC_IF $LXC_NET
 
 # mail
 #forward_to_outside tcp smtp
